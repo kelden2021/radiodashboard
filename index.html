@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LU2EQG | Station & WX Dashboard</title>
+  <style>
+    :root {
+      --bg-base: #0b0f17;
+      --bg-surface: #131a26;
+      --bg-card: #182130;
+      --border-subtle: rgba(148, 163, 184, 0.16);
+      --border-accent: rgba(56, 189, 248, 0.5);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --accent-cyan: #38bdf8;
+      --accent-green: #22c55e;
+      --radius: 12px;
+      --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.55);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* --- BARRA SUPERIOR (HUD) --- */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(19, 26, 38, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0.65rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: var(--accent-green);
+      box-shadow: 0 0 10px var(--accent-green);
+      animation: pulse 2.2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    .brand h1 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: var(--text-primary);
+    }
+
+    .brand span {
+      color: var(--accent-cyan);
+      font-weight: 400;
+      font-size: 0.9rem;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .btn, select.btn {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      padding: 0.38rem 0.7rem;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn:hover, select.btn:hover {
+      border-color: var(--border-accent);
+      background: #1e293b;
+      color: var(--accent-cyan);
+    }
+
+    .btn.action {
+      border-color: rgba(56, 189, 248, 0.3);
+      color: var(--accent-cyan);
+    }
+
+    .clocks {
+      display: flex;
+      gap: 1.1rem;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.85rem;
+    }
+
+    .clock-box {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .clock-label {
+      font-size: 0.62rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .clock-time { font-weight: 700; }
+    .clock-time.utc { color: var(--accent-cyan); }
+
+    /* --- GRILLA 3x2 RESPONSIVA --- */
+    main {
+      padding: 1rem 1.25rem;
+      flex: 1;
+      display: flex;
+    }
+
+    .dashboard-grid {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    @media (max-width: 1200px) {
+      .dashboard-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid { grid-template-columns: 1fr; }
+    }
+
+    /* --- TARJETAS --- */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.2s ease;
+    }
+
+    .card:hover { border-color: var(--border-accent); }
+
+    .card-header {
+      padding: 0.5rem 0.85rem;
+      background: rgba(11, 15, 23, 0.55);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+
+    .badge {
+      font-size: 0.62rem;
+      padding: 0.12rem 0.4rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .badge.wx   { background: rgba(56, 189, 248, 0.18); color: #38bdf8; }
+    .badge.live { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .badge.ais  { background: rgba(34, 197, 94, 0.18); color: #4ade80; }
+
+    .card-actions { display: flex; gap: 0.25rem; }
+
+    .icon-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 0.2rem 0.4rem;
+      cursor: pointer;
+      font-size: 0.78rem;
+    }
+
+    .icon-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--border-subtle);
+    }
+
+    .card-body {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      background: #070a10;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .card-body iframe,
+    .card-body img {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .card-body img.contain {
+      object-fit: contain;
+      background: #070a10;
+    }
+
+    /* --- MODAL PANTALLA COMPLETA --- */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 15, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      padding: 1.25rem;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .modal-content {
+      flex: 1;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border-accent);
+      background: #000;
+    }
+
+    .modal-content iframe,
+    .modal-content img {
+      width: 100%;
+      height: 100%;
+      border: none;
+      object-fit: contain;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="status-dot" title="Estación Activa"></div>
+      <h1 id="stationTitle">LU2EQG <span>// MONITOR</span></h1>
+    </div>
+
+    <div class="controls" id="topMenu">
+      <!-- Selector rápido para cambiar el feed de YouTube -->
+      <select class="btn action" id="ytSwitcher" title="Cambiar transmisión de YouTube">
+        <option value="yZh3xsFqCt8|DEUTSCHE WELLE">📺 YT: Deutsche Welle</option>
+        <option value="fO9e9jnhYK8|ESTACIÓN ESPACIAL">📺 YT: Estación Espacial (ISS)</option>
+        <option value="rvtygG4n6ew|GLOBALQUAKE">📺 YT: GlobalQuake</option>
+        <option value="jTDk5CswBVk|C5N EN VIVO">📺 YT: C5N En Vivo</option>
+      </select>
+      <button class="btn action" id="refreshImagesBtn" title="Forzar actualización de imágenes">↻ Satélite</button>
+    </div>
+
+    <div class="clocks">
+      <div class="clock-box">
+        <span class="clock-label">Local (AR)</span>
+        <span class="clock-time" id="localClock">--:--:--</span>
+      </div>
+      <div class="clock-box">
+        <span class="clock-label">UTC</span>
+        <span class="clock-time utc" id="utcClock">--:--:-- UTC</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="dashboard-grid" id="dashboardGrid"></div>
+  </main>
+
+  <div class="modal-overlay" id="expandModal">
+    <div class="modal-header">
+      <h2 id="modalTitle" style="font-size: 0.95rem;">Vista Ampliada</h2>
+      <button class="btn" id="closeModalBtn">✕ Cerrar (ESC)</button>
+    </div>
+    <div class="modal-content" id="modalBody"></div>
+  </div>
+
+  <script>
+    /**
+     * 
+     * CONFIGURACIÓN 
+     * 
+     */
+    const CONFIG = {
+      callsign: "LU2EQG",
+      subtitle: "WX & MONITORING",
+      imageRefreshMs: 100000, // ~100s 
+
+      // Enlaces de menú superior (aURL)
+      menuLinks: [
+        { label: "COSAS ORBITANDO", url: "https://stuffin.space/" },
+        { label: "THESKYLIVE", url: "https://theskylive.com/3dsolarsystem" },
+        { label: "LIGHTNING", url: "https://map.blitzortung.org/#3.87/36.5/-89.41" },
+        { label: "TIME.IS", url: "https://time.is/" },
+        { label: "WEATHER", url: "https://openweathermap.org/weathermap?basemap=map&cities=true&layer=temperature&lat=-34.8095&lon=-57.9846&zoom=9" },
+        { label: "WINDS", url: "https://earth.nullschool.net/#current/wind/surface/level/orthographic=-57.99,-34.80,3981/loc=-57.993,-34.803" },
+        { label: "CIANOBACTERIAS", url: "https://www.gba.gob.ar/cianobacterias/" }
+      ],
+
+      // Paneles principales (aIMG)
+      panels: [
+        {
+          id: "radar-lluvia",
+          title: "RADAR LLUVIA",
+          badge: "WINDY",
+          badgeClass: "wx",
+          type: "iframe",
+          source: "https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=°C&metricWind=km/h&zoom=5&overlay=rain&product=ecmwf&level=surface&lat=-35.434&lon=-58.337"
+        },
+        {
+          id: "nubes-ir",
+          title: "NUBES IR (GOES-19)",
+          badge: "SATÉLITE",
+          badgeClass: "wx",
+          type: "image",
+          fit: "contain",
+          source: "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/Sandwich/GOES19-SSA-Sandwich-900x540.gif"
+        },
+        {
+          id: "calidad-aire",
+          title: "CALIDAD DEL AIRE (NO₂)",
+          badge: "CAMS",
+          badgeClass: "wx",
+          type: "iframe",
+          source: "https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=default&metricTemp=default&metricWind=default&zoom=5&overlay=no2&product=cams&level=surface&lat=-36.563&lon=-61.348&detailLat=-34.819&detailLon=-57.976&marker=true&pressure=true&message=true"
+        },
+        {
+          id: "tiempo-local",
+          title: "TIEMPO LOCAL",
+          badge: "PRONÓSTICO",
+          badgeClass: "wx",
+          type: "iframe",
+          source: "https://api.wo-cloud.com/content/widget/?geoObjectKey=30079238&language=es&region=AR&timeFormat=HH:mm&windUnit=kmh&systemOfMeasurement=metric&temperatureUnit=celsius"
+        },
+        {
+          id: "youtube-live",
+          title: "DEUTSCHE WELLE",
+          badge: "EN VIVO",
+          badgeClass: "live",
+          type: "youtube",
+          source: "yZh3xsFqCt8"
+        },
+        {
+          id: "trafico-marino",
+          title: "TRÁFICO MARINO (RÍO DE LA PLATA)",
+          badge: "AIS",
+          badgeClass: "ais",
+          type: "iframe",
+          source: "https://www.marinetraffic.com/en/ais/embed/zoom:9/maptype:0/shownames:true/centery:-34.851/centerx:-57.884"
+        }
+      ]
+    };
+
+    /**
+     * 
+     * DASHBOARD
+     * 
+     */
+    const gridEl = document.getElementById("dashboardGrid");
+    const topMenuEl = document.getElementById("topMenu");
+    const modalEl = document.getElementById("expandModal");
+    const modalBody = document.getElementById("modalBody");
+    const modalTitle = document.getElementById("modalTitle");
+
+    // 1. Renderizar botones del menú superior
+    CONFIG.menuLinks.forEach(item => {
+      const a = document.createElement("a");
+      a.href = item.url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.className = "btn";
+      a.textContent = item.label;
+      topMenuEl.insertBefore(a, document.getElementById("ytSwitcher"));
+    });
+
+    // 2. Relojes Local y UTC
+    function updateClocks() {
+      const now = new Date();
+      document.getElementById("localClock").textContent = now.toLocaleTimeString("es-AR", {
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+      });
+      const utc = now.toISOString().substring(11, 19);
+      document.getElementById("utcClock").textContent = `${utc} UTC`;
+    }
+    setInterval(updateClocks, 1000);
+    updateClocks();
+
+    // 3. Generador de URLs limpias
+    function getMediaUrl(panel, bust = "") {
+      if (panel.type === "youtube") {
+        return `https://www.youtube-nocookie.com/embed/${panel.source}?autoplay=0&mute=1&rel=0`;
+      }
+      if (panel.type === "image") {
+        const sep = panel.source.includes("?") ? "&" : "?";
+        return `${panel.source}${sep}_t=${bust || Date.now()}`;
+      }
+      return panel.source;
+    }
+
+    // 4. Construir tarjetas
+    function renderGrid() {
+      gridEl.innerHTML = "";
+      const now = Date.now();
+
+      CONFIG.panels.forEach(panel => {
+        const card = document.createElement("article");
+        card.className = "card";
+        card.id = `card-${panel.id}`;
+
+        const url = getMediaUrl(panel, now);
+        const mediaTag = panel.type === "image"
+          ? `<img src="${url}" alt="${panel.title}" class="${panel.fit || ""}" data-raw="${panel.source}" loading="lazy">`
+          : `<iframe src="${url}" title="${panel.title}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe>`;
+
+        card.innerHTML = `
+          <div class="card-header">
+            <div class="card-title">
+              <span class="badge ${panel.badgeClass}">${panel.badge}</span>
+              <span class="title-text">${panel.title}</span>
+            </div>
+            <div class="card-actions">
+              <button class="icon-btn expand-btn" title="Pantalla completa">⛶</button>
+            </div>
+          </div>
+          <div class="card-body">${mediaTag}</div>
+        `;
+
+        card.querySelector(".expand-btn").addEventListener("click", () => {
+          modalTitle.textContent = panel.title;
+          modalBody.innerHTML = panel.type === "image"
+            ? `<img src="${getMediaUrl(panel, Date.now())}" alt="${panel.title}">`
+            : `<iframe src="${getMediaUrl(panel)}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+          modalEl.classList.add("open");
+        });
+
+        gridEl.appendChild(card);
+      });
+    }
+
+    // 5. Selector rápido de YouTube en vivo
+    document.getElementById("ytSwitcher").addEventListener("change", (e) => {
+      const [videoId, newTitle] = e.target.value.split("|");
+      const ytPanel = CONFIG.panels.find(p => p.id === "youtube-live");
+      if (ytPanel) {
+        ytPanel.source = videoId;
+        ytPanel.title = newTitle;
+        const card = document.getElementById("card-youtube-live");
+        card.querySelector(".title-text").textContent = newTitle;
+        card.querySelector("iframe").src = getMediaUrl(ytPanel);
+      }
+    });
+
+    // 6. Auto-refresco de imagen satelital GOES-19
+    function refreshSatellite() {
+      const now = Date.now();
+      document.querySelectorAll(".card-body img[data-raw]").forEach(img => {
+        const raw = img.getAttribute("data-raw");
+        img.src = `${raw}?_t=${now}`;
+      });
+    }
+    setInterval(refreshSatellite, CONFIG.imageRefreshMs);
+    document.getElementById("refreshImagesBtn").addEventListener("click", refreshSatellite);
+
+    // 7. Control del Modal
+    function closeModal() {
+      modalEl.classList.remove("open");
+      modalBody.innerHTML = "";
+    }
+    document.getElementById("closeModalBtn").addEventListener("click", closeModal);
+    modalEl.addEventListener("click", e => { if (e.target === modalEl) closeModal(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+    renderGrid();
+  </script>
+</body>
+</html>
